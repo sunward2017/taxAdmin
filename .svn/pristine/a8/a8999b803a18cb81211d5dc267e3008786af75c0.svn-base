@@ -1,0 +1,31 @@
+<template>
+  <div class="dashboard-container">
+      <div class="footer">
+          <h3>浙江梧斯源</h3>
+          <p>技术支持: 0571-88483380-801</p>
+      </div>
+  </div>
+</template>
+
+<script>
+import { mapGetters } from 'vuex'
+export default {
+  name: 'dashboard',
+  computed: {
+     
+  }
+}
+</script>
+
+<style rel="stylesheet/scss" lang="scss" scoped>
+ 
+.footer{
+  position:fixed;
+  right:200px;
+  bottom:50px;
+  font-family:"Times New Roman",Georgia,Serif;
+  h3{
+    text-align:center;
+  }
+}
+</style>

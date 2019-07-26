@@ -1,0 +1,161 @@
+<template>
+  <div class="login-container">
+    <el-form autoComplete="on" :model="loginForm" :rules="loginRules" ref="loginForm" label-position="left" label-width="70px"
+      class="card-box login-form">
+      <h3 class="title">服务机器人后台管理平台</h3>
+       <el-form-item prop="username" label="用户名">
+        <span class="svg-container svg-container_login">
+          <icon-svg icon-class="yonghuming" />
+        </span>
+        <el-input name="username" type="text" v-model="loginForm.username" autoComplete="on" placeholder="账号" />
+      </el-form-item>
+      <el-form-item prop="password" label="密码">
+        <span class="svg-container">
+          <icon-svg icon-class="mima" ></icon-svg>
+        </span>
+        <el-input name="password" type="password" @keyup.enter.native="handleLogin" v-model="loginForm.password" autoComplete="on"
+          placeholder="密码"></el-input>
+      </el-form-item>
+      <el-form-item>
+        <el-button type="success" style="width:100%;" :loading="loading" @click.native.prevent="handleLogin">
+          登录
+        </el-button>
+      </el-form-item>
+    </el-form>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'login',
+  data() {
+    const validatePass = (rule, value, callback) => {
+      if (value.length < 6) {
+        callback(new Error('密码不能小于6位'))
+      } else {
+        callback()
+      }
+    };
+    return {
+      loginForm: {
+        username: '',
+        password: ''
+      },
+      loginRules: {
+        username: [{ required: true, trigger: 'blur', message: '用户名不可为空' }],
+        password: [{ required: true, trigger: 'blur', validator: validatePass }]
+      },
+      loading: false
+    }
+  },
+  methods: {
+    handleLogin() {
+      this.$refs.loginForm.validate(valid => {
+        if (valid) {
+          this.loading = true;
+          this.$store.dispatch('Login', this.loginForm).then((res) => {
+            this.loading = false;
+            this.$router.push({ path: '/' })
+          }).catch(() => {
+            this.loading = false;
+              this.$notify({
+                title: '登录失败',
+                message: '请重新登录',
+                type: 'error'
+              });
+          })
+        } else {
+          console.log('error submit!!')
+          return false
+        }
+      })
+    }
+  }
+}
+</script>
+
+<style rel="stylesheet/scss" lang="scss">
+  @import "src/styles/mixin.scss";
+  $bg:#7eb345;
+
+  $dark_gray:#889aa4;
+  $light_gray:#333;
+
+  .login-container {
+    @include relative;
+    height: 100vh;
+    /*background:url(../../assets/TaxAdmin/login_bg.png);*/
+    background: url(../../assets/TaxAdmin/login_bg01.png);
+    background-size:100% 100%;
+    background-color: $bg;
+    input:-webkit-autofill {
+      -webkit-box-shadow: 0 0 0px 1000px #fff inset !important;
+      -webkit-text-fill-color: #333 !important;
+    }
+    input {
+      border:none;
+      -webkit-appearance: none;
+      border-radius: 0px;
+      padding: 6px 5px 6px 15px;
+
+      color: $light_gray;
+      height: 30px;
+    }
+    .el-form-item__content{
+       border:1px solid rgb(191, 203, 217);
+       line-height:26px
+    }
+    .el-input {
+      display: inline-block;
+      height: 30px;
+      width: 85%;
+    }
+    .tips {
+      font-size: 14px;
+      color: #fff;
+      margin-bottom: 10px;
+    }
+    .svg-container {
+      padding: 6px 5px 6px 15px;
+      color: $dark_gray;
+      vertical-align: middle;
+      width: 30px;
+      display: inline-block;
+      &_login {
+        font-size: 20px;
+      }
+    }
+    .title {
+      font-size: 16px;
+      font-weight: 400;
+      color: $bg;
+      margin: 0px auto 40px auto;
+      text-align: center;
+      font-weight: bold;
+      font-family:"Times New Roman",Georgia,Serif;
+    }
+    .login-form {
+      position: absolute;
+      left: 0;
+      right: 0;
+      width: 400px;
+      padding: 35px 35px 15px 35px;
+      margin: 15% auto;
+      background:#fff;
+    }
+
+    .show-pwd {
+      position: absolute;
+      right: 10px;
+      top: 7px;
+      font-size: 16px;
+      color: $dark_gray;
+      cursor: pointer;
+    }
+    .thirdparty-button{
+      position: absolute;
+      right: 35px;
+      bottom: 28px;
+    }
+  }
+</style>

@@ -1,0 +1,313 @@
+<template>
+  <div class="app-container">
+    <el-col :span="24" class="toolbar">
+      <el-form :inline="true" :model="filters">
+        <el-form-item>
+          <el-input v-model="filters.value" placeholder="请输入机器人ID"></el-input>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" icon="search" @click="handleSearch">查询</el-button>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" icon="plus" @click="handleAdd">新增</el-button>
+        </el-form-item>
+      </el-form>
+    </el-col>
+    <template>
+      <Grid :columns="robotRegisterColumns" :rows="tableData" v-loading="listLoading" @edit="handleEdit" @del="handleDel" :isEdit="true"
+        :isDelete="true" :isSpecial="true" @yx="mutual" :editWidth="400" :isLog='isLog' @log="showLog"/>
+    </template>
+    <el-dialog :title="formTitle" :visible.sync="formVisible" @close="reset">
+      <el-form :model="formModel" label-width="120px" :rules="formRules" ref="formRef">
+        <!-- <el-col :span="24">
+          <el-form-item label="机器人ID" prop="robotId">
+            <el-input v-model="formModel.robotId"></el-input>
+          </el-form-item>
+        </el-col> -->
+         
+          <el-form-item label="机器人名称" prop="robotName">
+            <el-input v-model="formModel.robotName"></el-input>
+          </el-form-item>
+          <el-form-item label="机器人型号" prop="model">
+            <el-input v-model="formModel.model"></el-input>
+          </el-form-item>
+         <el-form-item label="机器人地址" prop="address">
+            <el-input v-model="formModel.address"></el-input>
+          </el-form-item>
+          <el-form-item label="联系电话" prop="phoneNumber">
+            <el-input v-model="formModel.phoneNumber"></el-input>
+          </el-form-item>
+          <el-form-item label="机器人设备ID" prop="devId">
+            <el-input v-model="formModel.devId"></el-input>
+          </el-form-item>
+          <el-form-item label="系统版本号" prop="sysVer">
+            <el-input v-model="formModel.sysVer"></el-input>
+          </el-form-item>
+          <el-form-item label="机器人备注" prop="description">
+            <el-input v-model="formModel.description"></el-input>
+          </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="formVisible = false">取 消</el-button>
+        <el-button type="primary" @click="handleSubmitForm" :loading="isSubmitting">{{submitBtnText}}</el-button>
+      </div>
+    </el-dialog>
+    <el-dialog title="交互系统" v-model="yxVisible" size="large" top="5%" @close="resetCookie">
+      <iframe src="./webdemo/im/main.html" width="100%" height="700" frameborder="0" scrolling='no'></iframe>
+    </el-dialog>
+    <el-dialog title="日志信息" v-model="logVisible" @close="initMsg">
+      <Log :msg="curRobotId" ref="profile"></Log>
+    </el-dialog>  
+  </div>
+</template>
+<script>
+  import NProgress from 'nprogress'
+  import Grid from '../../components/Grid/Grid'
+  import {
+    robotRegisterColumns
+  } from '../../dictionary/columns'
+  import {
+    robotRegisterList,
+    saveRegisterRobot,
+    deleteRegisterRobot
+  } from '@/api/robot'
+
+  import Log from '../../components/runLog';
+  import Cookies from 'js-cookie'
+  import { getAccount } from '@/utils/auth'
+  import { resetObj,cloneObj} from '@/utils/cover'
+
+  export default {
+    components: {
+      Grid,
+      Log
+    },
+    data() {
+      var checkContact = (rule,str, callback) => {
+          let reg =  /^0?(13[0-9]|15[012356789]|17[013678]|18[0-9]|14[57])[0-9]{8}$/;
+          let value = str.replace(/^\s*$/g,'');
+          if(value==''){
+            return callback(new Error('手机号不能为空'));
+          }else if(!reg.test(value)) {
+            return callback(new Error('手机号码不正确'));
+          }else{
+            callback();
+          }
+
+        };
+      return {
+        filters: {
+          value: ''
+        },
+        formTitle: '',
+        formVisible: false,
+        formModel: {
+          robotId: 0,
+          robotName: '',
+          model: '',
+          address:'',
+          phoneNumber:'',
+          devId:'',
+          description:'',
+          sysVer:'',
+          Action:0
+        },
+        isSubmitting: false,
+        submitBtnText: '保存',
+        formRules: {
+            robotId:[{ required: true, message: '请输入机器人ID', trigger: 'blur' }],
+            robotName:[{ required: true, message: '请输入机器人名称', trigger: 'blur' }],
+            model:[{ required: true, message: '请输入机器人型号', trigger: 'blur' }],
+            address:[{ required: true, message: '请输入机器人地址', trigger: 'blur' }],
+            devId:[{ required: true, message: '请输入机器人ID', trigger: 'blur' }],
+            phoneNumber:[{ required: true, validator:checkContact,  trigger: 'blur' }],
+            sysVer:[{ required: true, message: '请输入机器人系统版本', trigger: 'blur' }],
+        },
+        robotRegisterColumns: robotRegisterColumns,
+        currentPage: 1,
+        listLoading: true,
+        tableData: [],
+        yxVisible:false,
+
+        //log
+        logVisible:false,
+        curRobotId:'',
+      }
+    },
+    created() {
+      this.getList()
+    },
+    computed:{
+        isLog:function(){
+            return   JSON.parse(unescape(getAccount())).account ==="system"
+        }
+    },
+    methods: {
+      getList() {
+        this.listLoading = true;
+        robotRegisterList({}).then(res => {
+          this.listLoading = false;
+          this.tableData = res.data;
+        });
+      },
+      handleSearch() {
+        this.listLoading = true;
+        if (this.filters.value == '') {
+          robotRegisterList({}).then(res => {
+            this.listLoading = false;
+            this.tableData = res.data;
+          });
+        } else {
+          robotRegisterList({
+            robotId: this.filters.value
+          }).then(res => {
+            this.listLoading = false;
+            this.tableData = res.data;
+          });
+        }
+
+      },
+      handleAdd() {
+        this.formTitle = '新增';
+        this.action = 'add';
+        this.formVisible = true;
+        this.formModel= resetObj(this.formModel);
+        this.formModel.robotId =0;
+        this.formModel.Action =0;
+      },
+      handleEdit(r) {
+        this.formTitle = "编辑";
+        this.action = 'edit';
+        this.formVisible = true;
+        this.formModel = cloneObj(r);
+        this.formModel.Action =1;
+      },
+      handleDel(r) {
+        this.$confirm("确认删除机器人吗？", '提示', {
+
+        }).then(() => {
+          this.listLoading = true;
+          NProgress.start();
+          deleteRegisterRobot({
+            Action: 2,
+            robotId: r.robotId
+          }).then((res) => {
+            this.listLoading = false;
+            NProgress.done();
+            if (res.result == '200') {
+              this.$notify({
+                title: '成功',
+                message: '删除成功',
+                type: 'success'
+              });
+              this.getList();
+            } else {
+              this.$notify({
+                title: '成功',
+                message: res.body.message,
+                type: 'error'
+              });
+            }
+            this.formVisible = false;
+          });
+        }).catch(() => {
+
+        });
+      },
+      handleSubmitForm() {
+        let params = cloneObj(this.formModel);
+        this.$refs.formRef.validate((valid) => {
+          if (valid) {
+            this.$confirm('确认提交吗？', '提示', {}).then(() => {
+              NProgress.start();
+              this.isSubmitting = true;
+              this.submitBtnText = '提交中';
+              if (this.formModel.Action==='0') {
+                saveRegisterRobot(params).then((res) => {
+                  this.isSubmitting = false;
+                  NProgress.done();
+                  this.submitBtnText = '提交';
+                  if (res.result == '200') {
+                    this.$notify({
+                      title: '成功',
+                      message: '新增成功',
+                      type: 'success'
+                    });
+
+                    this.getList();
+                  } else {
+                    this.$notify({
+                      title: '失败',
+                      message: res.message,
+                      type: 'error'
+                    });
+                  }
+                  this.formVisible = false;
+                });
+              } else {
+                saveRegisterRobot(params).then((res) => {
+                  this.isSubmitting = false;
+                  NProgress.done();
+                  this.submitBtnText = '提交';
+                  if (res.result == '200') {
+                    this.$notify({
+                      title: '成功',
+                      message: '编辑成功',
+                      type: 'success'
+                    });
+                    this.getList();
+                  } else {
+                    this.$notify({
+                      title: '失败',
+                      message: res.message,
+                      type: 'error'
+                    });
+                  }
+                  this.formVisible = false;
+                });
+              }
+            })
+          } else {
+
+          }
+        });
+      },
+      mutual(){
+          var token = JSON.parse(unescape(getAccount())).uid;
+          if(token){
+            Cookies.set('uid',token );
+            // Cookies.set("uid",'nurse00000129')
+            Cookies.set('sdktoken', token);
+            this.yxVisible=true;
+          }else{
+             this.$notify({
+                title: '提示',
+                message: '机器人没有注册',
+                type: 'info'
+              });
+          }
+      },
+      resetCookie(){
+          Cookies.set('uid','' );
+          Cookies.set('sdktoken', '');
+      },
+      reset(){
+         this.$refs.formRef.resetFields();
+      },
+      showLog: function(row) {
+        this.curRobotId = row.devId;
+        this.logVisible = true;
+        let _this = this;
+        this.$nextTick(function() {
+          _this.$refs.profile.getLogList();
+        })
+
+      },
+      initMsg: function() {
+        this.$refs.profile.initMsg();
+      },
+    }
+  }
+
+</script>
+

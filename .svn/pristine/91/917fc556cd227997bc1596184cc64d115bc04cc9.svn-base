@@ -1,0 +1,219 @@
+<template>
+	<section>
+	    <el-row :gutter="20" class="toolbar">
+	   	  <el-col :span="10">
+           <el-select v-model="typeId" placeholder="请选择类别" style="width:100%" @change="getInfoTree" >
+              <el-option
+                v-for="item in QAtypes"
+                :key="item.typeId"
+                :label="item.typrName"
+                :value="item.typeId">
+              </el-option>
+            </el-select>
+	   	  </el-col>
+	   	  <el-col :span="12">
+	   	  	  <el-input
+  			  	placeholder="输入关键字进行过滤"
+  			  	v-model="filterText">
+  			  </el-input>
+	   	  </el-col>
+	   </el-row> 
+    <el-row> 
+  		<el-tree
+        :loading="treeLoading"
+  		  class="filter-tree"
+  		  accordion
+  		  :data="data2"
+  		   node-key="id"
+  		  :props="defaultProps"
+  		  :filter-node-method="filterNode"
+  		  ref="tree2"
+  		  :render-content="renderContent">
+  		</el-tree>
+     </el-row> 
+     <el-dialog :title="formTitle" :visible.sync="formVisible">
+      <el-form :model="formModel" label-width="90px" :rules="formRules" ref="formRef">
+          <el-form-item label="上级">
+            <el-input v-model="formModel.Pcontent" :disabled="true"  type="textarea" :rows="8"></el-input>
+          </el-form-item>
+          <el-form-item label="内容" prop="content">
+            <el-input v-model="formModel.content" type="textarea" :rows="8"></el-input>
+          </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="formVisible = false">取 消</el-button>
+        <el-button type="primary" @click="handleSubmitForm" :loading="isSubmitting">{{submitBtnText}}</el-button>
+      </div>
+    </el-dialog>
+		 
+  </section>
+</template>
+<script>
+  import NProgress from 'nprogress'
+  import { QATree, QATypeList, QAInfoModify,QAInfoDelete} from '@/api/QA'
+  import { getToken,getAccount } from '@/utils/auth'
+
+  export default {
+    watch: {
+      filterText(val) {
+        this.$refs.tree2.filter(val);
+      }
+    },
+
+    methods: {
+      filterNode(value, data) {
+        if (!value) return true;
+        return data.title.indexOf(value) !== -1;
+      },
+      append(store, data) {
+        this.formTitle="添加"
+        this.formModel.id = 0;
+      	this.formModel.pid = data.id;
+        this.formModel.Action = 0;
+      	this.formModel.Pcontent = data.content?data.content:data.title;
+      	this.formModel.content ="";
+      	this.formVisible = true;
+      },
+
+      remove(store, data) {
+          this.$confirm("确认删除吗？", '提示', {
+
+          }).then((res) => {
+               NProgress.start();
+              QAInfoDelete({id:data.id,Action:2,pid:data.pid}).then((res)=>{
+                  this.listLoading = false;
+                  NProgress.done();
+                  if (res.result == '200') {
+                    this.$notify({
+                      title: '成功',
+                      message: '删除成功',
+                      type: 'success'
+                    });
+                    this.getInfoTree();
+                  } else {
+                    this.$notify({
+                      title: '失败',
+                      message: res.message,
+                      type: 'error'
+                    });
+                  }
+                  this.formVisible = false;
+              })     
+          })
+      },
+      edit(store,data){
+         this.formTitle = "编辑";
+         this.formModel.id = data.id;
+         this.formModel.pid = data.pid;
+         this.formModel.Action = 1;
+         this.formModel.content = data.content?data.content:data.title;
+         this.formModel.Pcontent ="";
+         this.formVisible = true;
+      },
+      renderContent(h, { node, data, store }) {
+        return (
+          <span>
+            <span>
+              <span>{node.label}</span>
+            </span>
+            <span style="float: right; margin-right: 20px">
+              <el-button size="mini" on-click={ () => this.append(store, data) }>添加</el-button>
+              <el-button size="mini" on-click={ () => this.edit(store, data) }>编辑</el-button>
+              <el-button size="mini" on-click={ () => this.remove(store, data) }>删除</el-button>
+            </span>
+          </span>);
+      },
+      getQAtypes(){
+        QATypeList({}).then(res => {
+            this.QAtypes = res.data;
+            this.typeId = res.data[0].typeId;
+            this.getInfoTree();
+        })  
+      },
+      getInfoTree(){
+        this.treeLoading = true;
+      	 QATree({typeId:this.typeId}).then((res)=>{
+            this.treeLoading = false;
+      	 	  this.data2 = res.data;
+      	 })
+      },
+      handleSubmitForm(){
+        this.$refs.formRef.validate((valid) => {
+          if (valid) {
+            this.$confirm('确认提交吗？', '提示', {}).then(() => {
+              NProgress.start();
+              this.isSubmitting = true;
+              this.submitBtnText = '提交中';
+              QAInfoModify({...this.formModel,typeId:this.typeId}).then((res)=>{
+                   this.isSubmitting = false;
+                    NProgress.done();
+                   this.submitBtnText = '提交';
+                   this.formVisible = false;
+                   if(res.result ==200){
+                      let msg = '';
+                     if(this.formModel.Action===0){
+                        msg = "添加成功"
+                     }else{
+                        msg = "修改成功"
+                     }
+                      this.$notify({
+                        title: '成功',
+                        message: msg,
+                        type: 'success'
+                      });
+                     this.getInfoTree(); 
+                   }else{
+                       this.$notify({
+                          title: '成功',
+                          message: res.message,
+                          type: 'error'
+                        });
+                   }
+                  
+              })
+            })
+          }    
+        });      
+      }
+    },
+    mounted(){
+       this.getQAtypes();
+    },
+    data() {
+      return {
+        filterText: '',
+        data2: [], 
+        defaultProps: {
+          children: 'children',
+          label: function(data,node){
+          	 let label = data.title?data.title:data.content
+          	return label
+          }
+        },
+        formModel:{
+        	pid:'',
+        	pContent:'',
+          content:'',
+          Action:0,
+        },
+        QAtypes:[],
+        typeId:'',
+        formTitle:'添加',
+        treeLoading:false,
+        formVisible:false,
+        isSubmitting:false,
+        submitBtnText:'提交',
+        formRules:{
+
+        }
+      };
+    }
+  };
+</script>
+<style scoped>
+  .toolbar{
+  	 margin:20px;
+  	 padding-left:20px;
+  }
+</style>
+	

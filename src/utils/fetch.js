@@ -1,0 +1,86 @@
+import axios from 'axios'
+import qs from "qs"
+import { Message,MessageBox} from 'element-ui'
+import store from '../store'
+import { getToken,getAccount } from '@/utils/auth'
+
+// 创建axios实例
+const service = axios.create({
+  baseURL: process.env.BASE_API, // api的base_url
+  timeout: 30000                  // 请求超时时间
+});
+
+const whiteList = ['AdminLogin.action'];
+// request 请求拦截器
+service.interceptors.request.use(config => {
+  config.headers['Content-Type'] = 'application/x-www-form-urlencoded;charset=UTF-8';
+  if(config.method==="post"){
+     if (config.url.indexOf(whiteList[0]) == -1) {
+          var  Account = JSON.parse(unescape(getAccount()));
+          var loginName = Account.account;
+          var cid = Account.cId;
+          //打印config.url
+          if(config.url.indexOf("AdminAdd")>0||config.url.indexOf("AdminModify")>0||config.url.indexOf("PointModify")>0){
+              //在config的data里面写入data,session,loginName,cId
+              config.data = {...config.data,session:getToken(),loginName:loginName,cId:cid};
+          }else{
+              //data session loginName cId
+              config.data = config.data?{...config.data,session:getToken(), account: loginName,cId:cid}:{session:getToken(),account: loginName,cId:cid}
+          }
+     }
+     config.data = qs.stringify(config.data);
+  }else if(config.method==="get"){
+          var  Account = JSON.parse(unescape(getAccount()));
+          var loginName = Account.account;
+          var cid = Account.cId;
+     config.url +="?session="+getToken()+'&account='+loginName+"&cId="+cid;
+  }
+  return config
+}, error => {
+  // Do something with request error
+  console.log(error); // for debug
+  Promise.reject(error)
+});
+
+// respone响应拦截器
+service.interceptors.response.use(
+  response => {
+    const res = response.data;
+    if (res.result == 400 ) {
+           MessageBox.confirm('会话过期，可以取消继续留在该页面，或者重新登录', '确定登出', {
+             confirmButtonText: '重新登录',
+             cancelButtonText: '取消',
+             type: 'warning'
+           }).then(() => {
+             store.dispatch('FedLogOut').then(() => {
+               location.reload()// 为了重新实例化vue-router对象 避免bug
+             })
+           })
+    }else if (res.result == 500) {
+      Message({
+        message: "通信失败",
+        type: 'error',
+        duration: 5 * 1000
+      });
+      store.dispatch('FedLogOut').then(() => {
+          location.reload()// 为了重新实例化vue-router对象 避免bug
+      });
+
+      // // 50008:非法的token; 50012:其他客户端登录了;  50014:Token 过期了;
+      return Promise.reject('error')
+    } else {
+      return response.data
+    }
+  },
+  error => {
+    console.log('err' + error);// for debug
+    // Message({
+    //   message: error.message,
+    //   type: 'error',
+    //   duration: 5 * 1000
+    // })
+    return Promise.reject(error)
+  }
+);
+
+export default service

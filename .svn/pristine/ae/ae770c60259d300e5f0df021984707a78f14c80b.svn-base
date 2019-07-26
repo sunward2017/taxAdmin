@@ -1,0 +1,209 @@
+<template>
+  <div class="app-container">
+    <el-row class="toolbar">
+      <el-col :span="22">
+        <el-input placeholder="请输入问题概要" v-model="QATitle">
+          <el-select v-model="selectType" slot="prepend" placeholder="请选择类别" @visible-change="handleVisibleChange()">
+            <el-option v-for="item in selectOptions" :key="item.typeId" :label="item.typrName" :value="item.typeId">
+            </el-option>
+          </el-select>
+        </el-input>
+      </el-col>
+      <el-col :span="2">
+        <el-button type="primary" style="margin-left:5px;width:100%" icon="check" @click="handleSubmit">提交</el-button>
+      </el-col>
+    </el-row>
+    <div class="QAContainer">
+      <div class="QContainer">
+        <el-col :span="24">
+          <el-col :span="23" style="margin:15px">
+            <el-tag :key="tag.question" v-for="tag in dynamicQuestions" style="margin:5px" :closable="true" :close-transition="false" @close="handleQuestionClose(tag)">
+              {{tag.question}}
+            </el-tag>
+            <el-col v-if="questionInputVisible">
+              <el-input placeholder="请输入问题" class="input-new-question" style="margin-top:10px;" v-model="questionInputValue" ref="saveQuestionInput" size="large">
+              </el-input>
+              <el-button class="button-save-question" style="margin-top:10px" @click="handleQuestionInputConfirm">确定</el-button>
+            </el-col>
+
+            <el-button v-else class="button-new-question" @click="showQuestionInput">+ 添加问题</el-button>
+          </el-col>
+        </el-col>
+      </div>
+      <div class="blankContainer"></div>
+      <div class="AContainer">
+        <el-col :span="24">
+          <el-col :span="23" style="margin:15px">
+            <el-tag :key="tag.answer" v-for="tag in dynamicAnswers" style="margin:5px" :closable="true" :close-transition="false" @close="handleAnswerClose(tag)">
+              {{tag.answer}}
+            </el-tag>
+            <el-col v-if="answerInputVisible">
+              <el-input placeholder="请输入答案" class="input-new-answer" style="margin-top:10px;" v-model="answerInputValue" ref="saveAnswerInput" size="large">
+              </el-input>
+              <el-input placeholder="请输入打点名称（如果没有则不输入）" class="input-new-point" style="margin-top:10px;" v-model="pointInputValue" ref="savePointInput" size="large">
+              </el-input>
+              <el-input placeholder="请输入区域名称（如果没有则不输入）" class="input-new-region" style="margin-top:10px;"  v-model="regionInputValue" ref="saveRegionInput" size="large">
+              </el-input>
+              <el-button class="button-save-answer" style="margin-top:10px" @click="handleAnswerInputConfirm">确定</el-button>
+            </el-col>
+
+            <el-button v-else class="button-new-answer" @click="showAnswerInput">+ 添加答案</el-button>
+          </el-col>
+        </el-col>
+      </div>
+    </div>
+  </div>
+</template>
+<style>
+.el-select .el-input {
+  width: 130px;
+}
+
+.QAContainer {
+  margin-top: 20px;
+  display: flex;
+  min-height: 80vh;
+  flex-direction: row;
+}
+
+.QContainer {
+  flex: 1 100%;
+  border: 1px solid rgb(191, 203, 217);
+}
+
+.blankContainer {
+  flex: 0.1 30px;
+}
+
+.AContainer {
+  flex: 1 100%;
+  border: 1px solid rgb(191, 203, 217);
+}
+</style>
+<script>
+import {
+  QATypeList,saveQA
+} from '@/api/QA'
+export default {
+  data() {
+    return {
+      selectOptions: [],
+      selectType: '',
+      QATitle:'',
+      dynamicQuestions: [],
+      dynamicAnswers: [],
+      questionInputVisible: false,
+      answerInputVisible: false,
+      inputValue: '',
+      questionInputValue:'',
+      answerInputValue:'',
+      pointInputValue:'',
+      regionInputValue:''
+    }
+  },
+  methods: {
+    handleAnswerClose(tag) {
+      this.dynamicAnswers.splice(this.dynamicAnswers.indexOf(tag), 1);
+    },
+    handleQuestionClose(tag) {
+      this.dynamicQuestions.splice(this.dynamicQuestions.indexOf(tag), 1);
+    },
+
+    showQuestionInput() {
+      this.questionInputVisible = true;
+      this.answerInputVisible = false;
+      this.questionInputValue='';
+      this.$nextTick(_ => {
+        this.$refs.saveQuestionInput.$refs.input.focus();
+      });
+    },
+
+    showAnswerInput() {
+      this.answerInputVisible = true;
+      this.questionInputVisible = false;
+      this.answerInputValue='';
+      this.pointInputValue='';
+      this.regionInputValue='';
+        this.$nextTick(_ => {
+          this.$refs.saveAnswerInput.$refs.input.focus();
+        });
+    },
+
+    handleVisibleChange() {
+      // alert(flag);
+      // this.selectOptions=
+      QATypeList({ cId: this.$store.getters.cId }).then(res => {
+        // this.listLoading = false;
+        this.selectOptions = res.data;
+      });
+    },
+
+    handleQuestionInputConfirm() {
+      let questionInputValue = this.questionInputValue;
+      if (questionInputValue) {
+        this.dynamicQuestions.push({ question: questionInputValue });
+      }
+      this.questionInputVisible = false;
+    },
+    handleAnswerInputConfirm() {
+      let answerInputValue = this.answerInputValue;
+      let pointInputValue = this.pointInputValue;
+      let regionInputValue = this.regionInputValue;
+      if (answerInputValue) {
+        if(pointInputValue&&regionInputValue){
+          this.dynamicAnswers.push({answer:answerInputValue,pointName:pointInputValue,regionName:regionInputValue});
+        }else if(pointInputValue){
+          this.dynamicAnswers.push({answer:answerInputValue,pointName:pointInputValue});
+        }else if(regionInputValue){
+          this.dynamicAnswers.push({answer:answerInputValue,regionName:regionInputValue});
+        }else{
+          this.dynamicAnswers.push({answer:answerInputValue});
+        }
+      }
+      // alert(JSON.stringify(this.dynamicAnswers));
+      this.answerInputVisible = false;
+    },
+    handleSubmit(){
+      // alert(this.selectType);
+      // alert(this.QATitle);
+
+      var json = {customId:this.$store.getters.cId,customName:'wsy',typeId:this.selectType,title:this.QATitle,question:this.dynamicQuestions,answer:this.dynamicAnswers};
+      // alert(JSON.stringify(json));
+      // alert(typeof(json));
+
+      saveQA({Action:0,cId: this.$store.getters.cId,QA:JSON.stringify(json)}).then(res=>{
+        if (res.result == '200') {
+                    this.$notify({
+                      title: '成功',
+                      message: '新增成功',
+                      type: 'success'
+                    });
+
+                  this.selectOptions=[];
+                  this.selectType= '';
+                  this.QATitle='';
+                  this.dynamicQuestions= [];
+                  this.dynamicAnswers= [];
+                  this.questionInputVisible= false;
+                  this.answerInputVisible= false;
+                  this.inputValue= '';
+                  this.questionInputValue='';
+                  this.answerInputValue='';
+                  this.pointInputValue='';
+                  this.regionInputValue='';
+
+                  } else {
+                    this.$notify({
+                      title: '失败',
+                      message: res.message,
+                      type: 'error'
+                    });
+                  }
+
+      });
+    }
+  }
+}
+
+</script>
+

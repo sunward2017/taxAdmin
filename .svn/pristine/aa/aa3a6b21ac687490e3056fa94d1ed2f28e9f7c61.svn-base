@@ -1,0 +1,245 @@
+ <template>
+  <div class="app-container">
+    <el-col :span="24" class="toolbar">
+      <el-form :inline="true" :model="filters">
+        <el-form-item>
+            <el-select v-model="filters.value" placeholder="请选择">
+                <el-option
+                  v-for="item in options"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value">
+                </el-option>
+              </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" icon="search" @click="getHotList">查询</el-button>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" icon="plus" @click="handleAdd">新增</el-button>
+        </el-form-item>
+      </el-form>
+    </el-col>
+    <template>
+      <Grid :columns="hotBigListColumns" :rows="tableData" v-loading="listLoading" @edit="handleEdit" @del="handleDel" :isEdit="true"
+        :isDelete="true" />
+    </template>
+    <el-dialog :title="formTitle" :visible.sync="formVisible" size="tiny">
+      <el-form :model="formModel" label-width="90px" :rules="formRules" ref="formRef">
+          <el-form-item label="类别" prop="pid">
+              <el-select v-model="formModel.pid" placeholder="请选择" style="width:100%">
+      			    <el-option
+      			      v-for="item in options"
+      			      :key="item.value"
+      			      :label="item.label"
+      			      :value="item.value">
+      			    </el-option>
+      			  </el-select>
+          </el-form-item>
+          <el-form-item label="类型" prop="taxType">
+             <el-input v-model="formModel.taxType"></el-input>
+          </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="formVisible = false">取 消</el-button>
+        <el-button type="primary" @click="handleSubmitForm" :loading="isSubmitting">{{submitBtnText}}</el-button>
+      </div>
+    </el-dialog>
+  </div>
+</template>
+
+<script>
+  import NProgress from 'nprogress'
+  import Grid from '../../components/Grid/Grid'
+  import {
+    hotBigListColumns
+  } from '../../dictionary/columns'
+  import { getList, saveSubmit} from '../../api/table';
+  import { resetObj,cloneObj} from '@/utils/cover'
+
+  export default {
+    components: {
+      Grid
+    },
+    data() {
+      return {
+        filters: {
+          value: '1'
+        },
+        options: [{
+          value: '1',
+          label: '一般纳税人'
+        }, {
+          value: '2',
+          label: '小规模纳税人'
+        }, {
+          value: '3',
+          label: '个体工商户'
+        }],
+        formTitle: '',
+        formVisible: false,
+        formModel: {
+           id:'',
+          pid: 1,
+          taxType:''
+        },
+        isSubmitting: false,
+        submitBtnText: '保存',
+        action: '',
+        formRules: {
+             pid: [{ required: true, message: '请选择类别', trigger: 'blur' }],
+             taxType: [{ required: true, message: '请输入类型', trigger: 'blur' }]
+        },
+        hotBigListColumns: hotBigListColumns,
+        currentPage: 1,
+        listLoading: true,
+        listQuery: {
+
+        },
+        tableData: []
+      }
+    },
+    created() {
+      this.getHotList()
+    },
+    methods: {
+      filterType(item){
+        let pid = this.filters.value;
+        if(pid){
+          if(item.pid==pid){
+            return item;
+          }
+        }else{
+           return item;
+        }
+        
+      },  
+      getHotList() {
+        this.listLoading = true;
+        let params = {pid:this.filters.value}
+    		getList("/admin/HotBigList.action",params).then(res => {
+    			this.listLoading =false;
+    			if(res.data){
+             let filterType = this.filterType
+    			   this.tableData = res.data.filter(filterType)
+    			}else{
+            this.tableData=[];
+    			}
+    				 
+    		}) 
+      },
+      handleAdd() {
+        this.formTitle = '新增';
+        this.action = 'add';
+        this.formModel.pid="1";
+        this.formModel.taxType ='';
+        this.formModel.id =0;
+        this.formVisible = true;
+      },
+      handleEdit(r) {
+        this.formTitle = "编辑";
+        this.action = 'edit';
+        this.formVisible = true;
+        this.formModel = cloneObj(r);
+        this.formModel.pid = this.formModel.pid.toString();
+      },
+      handleDel(r) {
+        this.$confirm("确认删除类别“" + r.typrName + "”吗？", '提示', {
+
+        }).then(() => {
+          this.listLoading = true;
+          NProgress.start();
+          saveSubmit("/admin/HotBigDelete.action",{
+            Action: 2,
+            id: r.id
+          }).then((res) => {
+            this.listLoading = false;
+            NProgress.done();
+            if (res.result == '200') {
+              this.$notify({
+                title: '成功',
+                message: '删除成功',
+                type: 'success'
+              });
+              this.getHotList();
+            } else {
+              this.$notify({
+                title: '成功',
+                message: res.body.message,
+                type: 'error'
+              });
+            }
+            this.formVisible = false;
+          });
+        }).catch(() => {
+
+        });
+      },
+      handleSubmitForm() {
+        let params = Object.assign(this.formModel);
+        this.$refs.formRef.validate((valid) => {
+          if (valid) {
+            this.$confirm('确认提交吗？', '提示', {}).then(() => {
+              NProgress.start();
+              this.isSubmitting = true;
+              this.submitBtnText = '提交中';
+              if (this.action === 'add') {
+                saveSubmit("/admin/HotBigModify.action?",{ ...params,
+                  Action: 0,
+                }).then((res) => {
+                  this.isSubmitting = false;
+                  NProgress.done();
+                  this.submitBtnText = '提交';
+                  if (res.result == '200') {
+                    this.$notify({
+                      title: '成功',
+                      message: '新增成功',
+                      type: 'success'
+                    });
+
+                    this.getHotList();
+                  } else {
+                    this.$notify({
+                      title: '失败',
+                      message: res.message,
+                      type: 'error'
+                    });
+                  }
+                  this.formVisible = false;
+                });
+              } else {
+                saveSubmit("/admin/HotBigModify.action?",{ ...params,
+                  Action: 1,
+                }).then((res) => {
+                  this.isSubmitting = false;
+                  NProgress.done();
+                  this.submitBtnText = '提交';
+                  if (res.result == '200') {
+                    this.$notify({
+                      title: '成功',
+                      message: '编辑成功',
+                      type: 'success'
+                    });
+
+                    this.getHotList();
+                  } else {
+                    this.$notify({
+                      title: '失败',
+                      message: res.message,
+                      type: 'error'
+                    });
+                  }
+                  this.formVisible = false;
+                });
+              }
+            })
+          } else {
+
+          }
+        });
+      }
+    }
+  }
+
+</script>
+

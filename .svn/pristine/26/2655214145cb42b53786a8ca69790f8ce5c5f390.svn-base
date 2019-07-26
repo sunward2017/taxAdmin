@@ -1,0 +1,135 @@
+<template>
+  <div class="app-wrapper" :class="{hideSidebar:!sidebar.opened}">
+    <div class="logo">
+        <img :src="img_logo" width="80" height="80" class="logo_pic"/>
+        <span class="title">税务机器人管理系统</span>
+        <div class="nav_bar">欢迎您:{{customer}},今天：{{date}} <span @click="logout" style="margin-left:25px;">登出</span></div>
+        <!-- <router-link class='inlineBlock' to="/"></router-link> -->
+
+    </div>
+    <div class="sidebar-wrapper">
+      <sidebar class="sidebar-container"></sidebar>
+    </div>
+    <div class="main-container">
+      <navbar></navbar>
+      <app-main></app-main>
+    </div>
+  </div>
+</template>
+
+
+<script>
+import { Navbar, Sidebar, AppMain } from '@/views/layout'
+import img_logo from '@/assets/TaxAdmin/2531624.png'
+import moment from 'moment'
+import { getAccount } from '@/utils/auth'
+
+export default {
+  name: 'layout',
+  components: {
+    Navbar,
+    Sidebar,
+    AppMain
+  },
+  computed: {
+    sidebar() {
+      return this.$store.state.app.sidebar
+    }
+  },
+  data(){
+    return{
+        img_logo,
+        customer:'',
+        date:'',
+    }
+  },
+  methods: {
+    logout() {
+      this.$store.dispatch('LogOut').then(() => {
+        location.reload()  // 为了重新实例化vue-router对象 避免bug
+      })
+    }
+  },
+  mounted(){
+     this.customer = JSON.parse(unescape(getAccount())).account;
+     this.date=moment().format('LLLL');
+  }
+}
+</script>
+
+<style rel="stylesheet/scss" lang="scss" scoped>
+    @import "src/styles/mixin.scss";
+    .logo{
+       background:url(../../assets/TaxAdmin/1071386.jpg);
+       height: 80px;
+       color: #ffffff;
+       padding-left:50px;
+       &>*{
+         float:left;
+       }
+       .logo_pic{
+        margin-top:6px;
+        margin-right:20px;
+       }
+       .title{
+         color:#fff;
+         font-size:25px;
+         font-weight:bold;
+         margin-top:30px;
+       }
+    }
+    .app-wrapper {
+        @include clearfix;
+        position: relative;
+        height: 100%;
+        width: 100%;
+        &.hideSidebar {
+            .sidebar-wrapper {
+                transform: translate(-180px, 0);
+                .sidebar-container {
+                    transform: translate(172px, 0);
+                }
+                &:hover {
+                    transform: translate(0, 0);
+                    .sidebar-container {
+                        transform: translate(0, 0);
+                    }
+                }
+            }
+            .main-container {
+                margin-left: 40px;
+            }
+        }
+        .nav_bar{
+            position:absolute;
+            top:50px;
+            right:40px;
+        }
+        .sidebar-wrapper {
+            width: 220px;
+            position: fixed;
+            top: 80px;
+            bottom: 0;
+            left:0;
+            z-index: 1001;
+            overflow: hidden;
+            transition: all .28s ease-out;
+             
+        }
+        .sidebar-container {
+            transition: all .28s ease-out;
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: -17px;
+            overflow-y: scroll;
+            border-radius: 0px !important;
+        }
+        .main-container {
+            min-height: 100%;
+            transition: all .28s ease-out;
+            margin-left: 220px;
+        }
+    }
+</style>

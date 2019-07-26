@@ -1,0 +1,211 @@
+ <template>
+	<section>
+		<!--工具条-->
+		<el-col :span="24" class="toolbar">
+			<el-form :inline="true" :model="filters">
+				<!-- <el-form-item>
+					  <el-select v-model="filters.cid" placeholder="请选择" >
+					    <el-option
+					      v-for="item in customs"
+					      :key="item.cId"
+					      :label="item.customerName"
+					      :value="item.cId">
+					    </el-option>
+					  </el-select>
+				</el-form-item>
+				<el-form-item>
+					<el-button type="primary" icon="search" v-on:click="getManger()">查询</el-button>
+				</el-form-item> -->
+				<el-form-item>
+					<el-button type="primary" @click="handleAdd" icon="plus">新增</el-button>
+				</el-form-item>
+			</el-form>
+		</el-col>
+		<!--列表-->
+		<template>
+			<Grid :columns="videoListColumns" :rows="tableData"  v-loading="listLoading" @edit="handleEdit" @del="handleDel" :isEdit="true" 
+			:isDelete="true"/>
+		</template>
+	    
+	    <!--编辑界面-->
+		<el-dialog :title="editFormTtile" v-model="editFormVisible" :close-on-click-modal="false" size="tiny">
+			<el-form :model="editForm" label-width="90px" :rules="editFormRules" ref="editForm">
+			   <!-- <el-form-item label="客户名称" prop="cId">
+					  <el-select v-model="editForm.cId" placeholder="请选择客户" style="width:100%" >
+					    <el-option
+					      v-for="item in customs"
+					      :key="item.cId"
+					      :label="item.customerName"
+					      :value="item.cId">
+					    </el-option>
+					  </el-select>
+				</el-form-item> -->
+			    <el-form-item label="视频描述" prop="content">
+			    	<el-input v-model="editForm.content" auto-complete="off"></el-input>
+			    </el-form-item>	
+			     <el-form-item label="视频文件">
+			    	<Upload :param="editForm" :url="url" strRegExp=".MP4" ref="upload" @callback="refreshList" :fileList="fileList"/>  
+			    </el-form-item>	
+			</el-form>
+			<div slot="footer" class="dialog-footer">
+				<el-button @click.native="cancel"  icon="circle-cross">取 消</el-button>
+				<el-button type="primary" icon="upload2" @click.native="editSubmit" :loading="editLoading">{{btnEditText}}</el-button>
+			</div>
+		</el-dialog>
+	</section>
+</template>
+
+<script>
+    import NProgress from 'nprogress'
+	import Grid from '../../components/Grid/Grid'
+	import { getList, saveSubmit} from '../../api/table';
+	import { videoListColumns } from '../../dictionary/columns';
+    import { resetObj,cloneObj} from '@/utils/cover'
+ 	import Upload from "../../components/Upload";
+ 	import { getToken,getAccount } from '@/utils/auth'
+ 	 
+	export default {
+		components: {
+			Grid,
+			Upload
+		},
+		data() {
+			return {
+				filters:{}, 
+				videoListColumns:videoListColumns,
+				customs:'',
+				tableData:[],
+				//编辑
+				editFormTtile:"新增",
+				editFormVisible:false,
+				editLoading:false,
+				listLoading:false,
+				btnEditText:'提交',
+				editForm:{
+					content:'',
+					Action:'',
+					videoId:'',
+					session:'',
+					account:'',
+					cId: '',
+				},
+				url:'/admin/VideoModify.action',
+				editFormRules:{
+                    content: [{ required: true, message: '请输入视频描述', trigger: 'blur' }],		
+				},
+				fileList:[],
+			}
+		},
+		methods: {
+			getCustoms() {
+				getList("/admin/CustomerList.action",{}).then(res => {
+					 if(res&&res.data){
+					 	this.customs = res.data;
+					 	var obj = {};
+					 	res.data.forEach(item =>{
+					 		obj[item.cId] = item.customerName
+					 	})
+					    this.$store.dispatch('setClients',obj);
+					    this.getManger();	 
+					 };
+				})
+			},
+			getManger() {
+				this.listLoading = true;
+				 
+				getList("/admin/VideoList.action",{}).then(res => {
+					this.listLoading =false;
+					if(res.data){
+					   this.tableData = res.data	
+					}else{
+                       this.tableData=[];
+					}
+						 
+				})
+			},
+			handleAdd(){
+				this.editFormTtile="新增";
+				this.editForm = resetObj(this.editForm);
+				this.editForm.Action=0;
+				this.editForm.videoId =0;
+			 
+				this.editForm.session= getToken();
+				this.editForm.account= JSON.parse(unescape(getAccount())).account;
+				this.editForm.cId = JSON.parse(unescape(getAccount())).cId;
+				this.editFormVisible=true;
+			},
+			cancel(){
+               this.editFormVisible=false;
+			},
+			editSubmit() {
+				this.$refs.editForm.validate((valid) => {
+		          if (valid) {
+		            this.$confirm('确认提交吗？', '提示', {}).then(() => { 
+				       this.$refs.upload.submit();
+				      })
+				   }	
+				})
+      		},
+			handleEdit(r){
+				this.editFormVisible=true;
+                this.editForm.content = r.content;
+                this.editForm.fileSzie =r.fileSzie;
+                this.editForm.md5 = r.md5;
+                this.editForm.cId = JSON.parse(unescape(getAccount())).cId;
+                this.editForm.videoId = r.videoId;
+                this.editForm.videoUrl =r.videoUrl;
+                this.editForm.Action=1;
+             
+			},
+			handleDel(r){
+			    var _this = this;
+				this.$confirm('确认删除视频', '提示', {
+					//type: 'warning'
+				}).then(() => {
+					_this.listLoading = true;
+					NProgress.start();
+					let para = {
+						videoId: r.videoId,
+						Action:2
+					};
+					saveSubmit("/admin/VideoDelete.action",para).then((res) => {
+						_this.listLoading = false;
+						NProgress.done();
+						if(res.result=="200"){
+							_this.$notify({
+								title: '成功',
+								message: '删除成功',
+								type: 'success'
+							});
+							_this.getManger();
+						}else{
+							 _this.$notify({
+								title: '失败',
+								message: res.message,
+								type: 'error'
+							});
+						}
+						_this.editFormVisible = false;	
+					});
+
+				}).catch(() => {
+
+				});
+			},
+			refreshList(res){
+				this.editFormVisible=false;
+				this.getManger();
+			}
+		},
+		mounted() {
+		   this.getManger();
+		}
+	}
+</script>
+
+<style scoped>
+  .toolbar{
+  	 padding-top:20px;
+  	 padding-left:20px;
+  }
+</style>

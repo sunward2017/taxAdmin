@@ -1,0 +1,144 @@
+ <template>
+	<section>
+		<!--工具条-->
+		<el-col :span="24" class="toolbar">
+			<el-form :inline="true" :model="filters">
+				<el-form-item>
+					<el-input v-model="filters.logType" placeholder="日志类型"></el-input>
+				</el-form-item>
+				<el-form-item>
+					<el-button type="primary" v-on:click="getLogList">查询</el-button>
+				</el-form-item>
+			</el-form>
+		</el-col>
+
+		<!--列表-->
+		<template>
+			<el-table :data="robotLogs" highlight-current-row v-loading="listLoading" style="width: 100%;height:300px;overflow-y:auto">
+				<el-table-column type="index" width="80" label="序号">
+				</el-table-column>
+				<el-table-column prop="createTime" label="创建时间" align="center" width="230" sortable>
+	                <template scope="scope">
+				        <el-icon name="time"></el-icon>
+				        <span style="margin-left:10px">{{ scope.row.cTime }}</span>
+				      </template> 
+				</el-table-column>
+				<el-table-column prop="robotName" label="机器人ID"  align="center" >
+				    <template scope="scope">
+				      <el-tag type="">{{scope.row.robotId}}</el-tag>
+				   </template> 
+				</el-table-column>
+				<el-table-column prop="logType" label="日志类别" width="120" align="center">
+				</el-table-column>
+				<!-- <el-table-column prop="logUrl" label="日志来源" align="center" >
+				</el-table-column> -->
+				<el-table-column  prop="logUrl"  label="操作" width="100" align="center">
+				    <template scope="scope"> 
+					   <!-- <a  :href="root+scope.row.logUrl"  target="_blank">下载</a> -->
+					   <el-button size="small" @click="download(scope.row.fileUrl)">下载</el-button>
+					</template> 
+				</el-table-column>
+			</el-table>
+		</template>
+
+		<!--分页-->
+		<!-- <el-col :span="24" class="toolbar" style="padding-bottom:10px;">
+			<el-pagination 
+				layout="prev, pager, next,total,sizes,jumper" 
+				@current-change="handleCurrentChange" 
+				:page-sizes="[10, 20, 30, 40]" 
+				:page-size="size" 
+				:current-page="page"
+				:total="total" 
+				style="float:right;"
+				@size-change="handleSizeChange"
+				>
+			</el-pagination>
+		</el-col> -->
+	</section>
+</template>
+
+<script scope>
+	// import util from '../../common/util'
+	import NProgress from 'nprogress'
+	import { getRobotLogList } from '@/api/robot';
+	import { parseTime } from '../../utils';
+	 
+	export default {
+		name:'Log',
+		props:{
+           msg:{
+           	  type:String,
+           }
+		},
+		data() {
+				return {
+					filters: {
+					   logType: ''
+					},
+					robotLogs: [],
+					total: 0,
+					page: 1,
+					size:10,
+					listLoading: false,
+					 
+				}
+			},
+		methods: {
+			//显示转换
+			 
+			handleCurrentChange(val) {
+				this.page = val;
+				this.getLogList();
+			},
+			handleSizeChange(size){
+				this.page = 1;
+				this.size =size;
+				this.getLogList();
+			},
+			getLogList() {
+				let para = {
+					robotId: this.msg,
+					//page: this.page,
+					//pageSize: this.size
+				};
+				if(this.filters.logType!=''){
+					para.logType= this.filters.logType;
+				}
+				this.listLoading = true;
+				NProgress.start();
+				 
+			   getRobotLogList(para).then((res) => {
+					if(res.data){
+					   // this.total = res.data.data.total;
+					   this.robotLogs = res.data;	
+					}else{
+						this.total =0;
+						this.robotLogs = [];
+					}
+					this.listLoading = false;
+					NProgress.done();
+				 }); 
+			},
+			download(url){
+				console.log(url)
+				var a = document.createElement('a');
+					a.download = name;
+					a.href = "." + url;
+					// 模拟a标签点击进行下载
+					a.click();
+			  
+			},
+			initMsg(){
+				this.filters.logType='';
+			}
+		},
+		mounted() {
+		  this.getLogList();
+		}
+	}
+</script>
+
+<style scoped>
+
+</style>
